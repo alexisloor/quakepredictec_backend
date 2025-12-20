@@ -12,7 +12,7 @@ app = FastAPI(title="QuakePredictEC Backend")
 
 # CORS
 origins = [
-    "http://localhost:5500",
+    "http://127.0.0.1:5500",
     "http://localhost:8000",
     "https://alexisloor.github.io",  # interfaz desplegaada en gitHub pages
 ]
@@ -66,22 +66,12 @@ def register_user(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
 
 # Login de usuario
 @app.post("/login", response_model=schemas.Token)
-def login(email: str, password: str, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas.",
-        )
-
-    if not auth.verify_password(password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas.",
-        )
+def login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == payload.email).first()
+    if not user or not auth.verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas.")
 
     access_token = auth.create_access_token(data={"sub": user.email})
-
     return {"access_token": access_token, "token_type": "bearer"}
 
 

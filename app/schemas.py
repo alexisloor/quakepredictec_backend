@@ -1,13 +1,14 @@
 # app/schemas.py
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional
+
 
 
 class UserBase(BaseModel):
     first_name: str
     last_name: str
-    email: EmailStr
+    email: str
     username: Optional[str] = None
 
 
@@ -20,8 +21,12 @@ class UserOut(UserBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        model_config = ConfigDict(from_attributes=True)
 
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 class Token(BaseModel):
     access_token: str
@@ -30,3 +35,4 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+
