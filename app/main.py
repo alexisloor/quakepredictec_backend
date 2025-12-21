@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from . import models, schemas, auth
 from .database import engine, Base, get_db
+from typing import List
+from .models import City, Subscription
 
 # Crear las tablas si no existen
 Base.metadata.create_all(bind=engine)
@@ -99,3 +101,77 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 @app.get("/me", response_model=schemas.UserOut)
 def read_me(current_user=Depends(get_current_user)):
     return current_user
+
+
+# (Opcional) endpoint para listar ciudades
+@app.get("/cities", response_model=List[schemas.CityOut])
+def list_cities(db: Session = Depends(get_db)):
+    return db.query(City).order_by(City.name.asc()).all()
+
+# Suscribirse a varias ciudades (requiere login)
+@app.post("/subscribe")
+def subscribe(payload: schemas.SubscribeRequest,
+              db: Session = Depends(get_db),
+              current_user=Depends(get_current_user)):
+
+    # validar que existan
+    cities = db.query(City).filter(City.id.in_(payload.city_ids)).all()
+    found_ids = {c.id for c in cities}
+    missing = [cid for cid in payload.city_ids if cid not in found_ids]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Ciudades no válidas: {missing}")
+
+    created = 0
+    for cid in payload.city_ids:
+        exists = db.query(Subscription).filter(
+            Subscription.user_id == current_user.id,
+            Subscription.city_id == cid
+        ).first()
+        if not exists:
+            db.add(Subscription(user_id=current_user.id, city_id=cid))
+            created += 1
+
+    db.commit()
+    return {"ok": True, "added": created}
+
+# Ver mis suscripciones
+@app.get("/my-subscriptions", response_model=List[schemas.CityOut])
+def my_subscriptions(db: Session = Depends(get_db),
+                     current_user=Depends(get_current_user)):
+
+    rows = (
+        db.query(City)
+        .join(Subscription, Subscription.city_id == City.id)
+        .filter(Subscription.user_id == current_user.id)
+        .order_by(City.name.asc())
+        .all()
+    )
+    return rows
+
+# Desuscribirse de una ciudad
+@app.delete("/unsubscribe/{city_id}")
+def unsubscribe(city_id: int,
+                db: Session = Depends(get_db),
+                current_user=Depends(get_current_user)):
+
+    sub = db.query(Subscription).filter(
+        Subscription.user_id == current_user.id,
+        Subscription.city_id == city_id
+    ).first()
+
+    if not sub:
+        raise HTTPException(status_code=404, detail="No estabas suscrito a esa ciudad.")
+
+    db.delete(sub)
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/seed-cities")
+def seed_cities(db: Session = Depends(get_db)):
+    names = ["Quito", "Guayaquil", "Cuenca", "Manta"]
+    for n in names:
+        if not db.query(City).filter(City.name == n).first():
+            db.add(City(name=n))
+    db.commit()
+    return {"ok": True}

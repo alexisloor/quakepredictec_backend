@@ -2,6 +2,7 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional
+from typing import List
 
 
 
@@ -36,3 +37,18 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
 
+class CityOut(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+class SubscribeRequest(BaseModel):
+    city_ids: List[int]   # ejemplo: [1,2,5]
+
+class SubscriptionOut(BaseModel):
+    city: CityOut
+
+    class Config:
+        from_attributes = True
