@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from . import models, schemas, auth
 from .database import engine, Base, get_db
-from services.predict_service import sismo_service
+from services.predict_service import sismo_service, obtener_reporte_con_historial
 from typing import List
 from .models import City, Subscription
 
@@ -104,12 +104,12 @@ def read_me(current_user=Depends(get_current_user)):
     return current_user
 
 @app.get("/riesgo-sismico")
-def obtener_riesgo():
+def obtener_riesgo(db: Session = Depends(get_db)):
     """
     Retorna la lista de cantones con su predicción de sismo.
     El frontend usará esto para pintar el mapa.
     """
-    datos = sismo_service.generar_mapa_riesgo()
+    datos = obtener_reporte_con_historial(db)
     return datos
 
 # (Opcional) endpoint para listar ciudades

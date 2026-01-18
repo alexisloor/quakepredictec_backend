@@ -1,5 +1,5 @@
 # app/models.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -38,3 +38,17 @@ class Subscription(Base):
 
     # evita que el mismo usuario se suscriba 2 veces a la misma ciudad
     __table_args__ = (UniqueConstraint("user_id", "city_id", name="uq_user_city"),)
+
+class PredictionReport(Base):
+    __tablename__ = "prediction_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Fecha de la predicción
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Nombre del Canton 
+    location = Column(String, nullable=False, index=True)
+    
+    probability = Column(Float, nullable=False)
+    
+    risk_level = Column(String, nullable=False)

@@ -2,6 +2,10 @@ import os
 import pandas as pd
 import requests
 import xgboost as xgb 
+from sqlalchemy.orm import Session  
+from sqlalchemy import func         
+from datetime import date
+from app import models              
 
 # Ruta al modelo
 SERVICES_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -131,3 +135,71 @@ class SismoService:
         return "ALTO", "#dc3545"
 
 sismo_service = SismoService()
+
+
+def obtener_reporte_con_historial(db: Session):
+    fecha_hoy = date.today()
+    print(f"Consultando historial para: {fecha_hoy}")
+
+    # 1. Buscar en BD
+    registros_hoy = db.query(models.PredictionReport).filter(
+        func.date(models.PredictionReport.created_at) == fecha_hoy
+    ).all()
+
+    # 2. ESCENARIO A: YA EXISTEN (Retornar desde BD)
+    if registros_hoy:
+        print(f"Se encontraron {len(registros_hoy)} registros en BD.")
+        
+        # Reconstruir la respuesta para el frontend (agregando lat/lon/color)
+        resultados_reconstruidos = []
+        
+        # Crear un mapa rápido de cantones para buscar lat/lon por nombre
+        mapa_cantones = {c['canton']: c for c in CANTONES_MUESTRA}
+        
+        for reporte in registros_hoy:
+            # Recuperar datos estáticos del mapa
+            info_geo = mapa_cantones.get(reporte.location, {"lat": 0, "lon": 0})
+            
+            # Recalcular color (es lógica visual, no se guarda en BD para ahorrar espacio)
+            _, color = sismo_service.calcular_semaforo(reporte.probability)
+            
+            resultados_reconstruidos.append({
+                "canton": reporte.location,
+                "lat": info_geo["lat"],
+                "lon": info_geo["lon"],
+                "probabilidad": reporte.probability,
+                "nivel_riesgo": reporte.risk_level,
+                "color": color,
+                "fecha": reporte.created_at # Opcional
+            })
+            
+        return resultados_reconstruidos
+
+    # 3. ESCENARIO B: NO EXISTEN (Calcular y Guardar)
+    print("No hay registros de hoy. Iniciando cálculo con XGBoost...")
+    
+    # Calcular usando la clase existente
+    nuevas_predicciones = sismo_service.generar_mapa_riesgo()
+    
+    # Verificar si hubo error en el cálculo
+    if isinstance(nuevas_predicciones, list) and len(nuevas_predicciones) > 0 and "error" in nuevas_predicciones[0]:
+         print("Error en cálculo, no se guardará en BD.")
+         return nuevas_predicciones
+
+    # Guardar en Postgres
+    try:
+        for item in nuevas_predicciones:
+            nuevo_registro = models.PredictionReport(
+                location=item['canton'],
+                probability=item['probabilidad'],
+                risk_level=item['nivel_riesgo']
+            )
+            db.add(nuevo_registro)
+        
+        db.commit()
+        print("Nuevas predicciones guardadas exitosamente en la base Postgres.")
+    except Exception as e:
+        print(f"Error guardando en BD: {e}")
+        db.rollback()
+    
+    return nuevas_predicciones
