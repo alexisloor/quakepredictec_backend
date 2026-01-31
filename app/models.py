@@ -22,7 +22,9 @@ class City(Base):
     __tablename__ = "cities"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
-
+    province = Column(String, nullable=True)
+    lat = Column(Float, nullable=False, default=0.0)
+    lon = Column(Float, nullable=False, default=0.0)
     subscriptions = relationship("Subscription", back_populates="city", cascade="all, delete-orphan")
 
 

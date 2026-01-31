@@ -7,9 +7,22 @@ from .database import engine, Base, get_db
 from services.predict_service import sismo_service, obtener_reporte_con_historial
 from typing import List
 from .models import City, Subscription
+from .init_data import init_cities
 
 # Crear las tablas si no existen
 Base.metadata.create_all(bind=engine)
+
+# -----------------------------------------------------
+# solo para cargar los cantones
+try:
+    db = SessionLocal()
+    init_cities(db)  
+    print("Inicialización de datos completada.")
+except Exception as e:
+    print(f"Error inicializando datos: {e}")
+finally:
+    db.close()
+# -----------------------------------------------------
 
 app = FastAPI(title="QuakePredictEC Backend")
 
@@ -112,7 +125,7 @@ def obtener_riesgo(db: Session = Depends(get_db)):
     datos = obtener_reporte_con_historial(db)
     return datos
 
-# (Opcional) endpoint para listar ciudades
+# Endpoint para listar ciudades
 @app.get("/cities", response_model=List[schemas.CityOut])
 def list_cities(db: Session = Depends(get_db)):
     return db.query(City).order_by(City.name.asc()).all()
