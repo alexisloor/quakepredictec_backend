@@ -3,7 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from . import models, schemas, auth
-from .database import engine, Base, get_db
+from .database import engine, Base, get_db, SessionLocal
 from services.predict_service import sismo_service, obtener_reporte_con_historial
 from typing import List
 from .models import City, Subscription
