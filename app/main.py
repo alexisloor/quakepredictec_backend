@@ -9,6 +9,8 @@ from typing import List
 from .models import City, Subscription
 from .init_data import init_cities
 
+models.City.__table__.drop(engine, checkfirst=True)
+
 # Crear las tablas si no existen
 Base.metadata.create_all(bind=engine)
 
